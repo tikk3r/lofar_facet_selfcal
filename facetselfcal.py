@@ -62,6 +62,7 @@ import tables
 
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
+from astropy.time import Time
 from astropy.wcs import WCS
 from astroquery.skyview import SkyView
 from losoto import h5parm
