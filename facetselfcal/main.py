@@ -303,7 +303,7 @@ def is_stokesi_modeltype_allowed(args, telescope):
             if not args['disable_primary_beam']:
                 return False # so in this case we want the keep the primary beam polarization information    
     
-    notallowed_list = ['complexgain', 'amplitudeonly', 'phaseonly', 'fulljones', 'rotation', 'rotation+diagonal', 'rotation+diagonalphase', 'rotation+diagonalamplitude', 'rotation+scalar', 'rotation+scalaramplitude', 'rotation+scalarphase', 'phaseonly_phmin', 'rotation_phmin', 'phaseonly_slope','scalarphasediff','scalarphasediffFR']
+    notallowed_list = ['complexgain', 'amplitudeonly', 'phaseonly', 'fulljones', 'rotation', 'rotation+diagonal', 'rotation+diagonalphase', 'rotation+diagonalamplitude', 'rotation+scalar', 'rotation+scalaramplitude', 'rotation+scalarphase', 'phaseonly_phmin', 'rotation_phmin', 'phaseonly_slope','scalarphasediff','scalarphasediffFR', 'phaseonly_rate']
     for soltype in args['soltype_list']:
         if soltype in notallowed_list: return False
     return True
@@ -1966,7 +1966,7 @@ def create_phase_slope(inmslist, incol='DATA', outcol='DATA_PHASE_SLOPE',
         del data, dataslope
     return
 
-def create_phase_rate(inmslist, incol='DATA', outcol='DATA_PHASE_SLOPE',
+def create_phase_rate(inmslist, incol='DATA', outcol='DATA_PHASE_RATE',
                        ampnorm=False, dysco=False, testscfactor=1., crosshandtozero=True):
     """ Creates a new column to solve for a phase slope from.
 
@@ -3529,7 +3529,7 @@ def inputchecker(args, mslist):
                            'tecandphase', 'scalarphase',
                            'scalarphasediff', 'scalarphasediffFR', 'phaseonly_phmin',
                            'rotation_phmin', 'tec_phmin',
-                           'tecandphase_phmin', 'scalarphase_phmin', 'scalarphase_slope', 'phaseonly_slope']:
+                           'tecandphase_phmin', 'scalarphase_phmin', 'scalarphase_slope', 'phaseonly_slope', 'scalarphase_rate', 'phaseonly_rate']:
             print('Invalid soltype input')
             raise Exception('Invalid soltype input')
 
@@ -7432,6 +7432,17 @@ def runDPPPbase(ms, solint, nchan, parmdb, soltype, uvmin=1.,
                                           updateweights=True, originalmodel='MODEL_DATA',
                                           newmodel='MODEL_DATA_PHASE_SLOPE', backup=True)
 
+    if soltype in ['phaseonly_rate', 'scalarphase_rate']:
+        create_phase_rate(ms, incol=incol, outcol='DATA_PHASE_RATE', ampnorm=True, dysco=dysco)
+        create_phase_rate(ms, incol='MODEL_DATA', outcol='MODEL_DATA_PHASE_RATE', ampnorm=True, dysco=dysco)
+        soltype = soltype.split('_rate')[0]
+        incol = 'DATA_PHASE_RATE'
+        modeldata = 'MODEL_DATA_PHASE_RATE'
+        # udpate weights according to weights * (MODEL_DATA/MODEL_DATA_PHASE_RATE)**2
+        create_weight_spectrum_modelratio(ms, 'WEIGHT_SPECTRUM_PM',
+                                          updateweights=True, originalmodel='MODEL_DATA',
+                                          newmodel='MODEL_DATA_PHASE_RATE', backup=True)
+
     if soltype in ['phaseonly', 'complexgain', 'fulljones', 'rotation+diagonal', 'amplitudeonly',
                    'rotation+diagonalamplitude',
                    'rotation+diagonalphase']:  # for 1D plotting
@@ -7476,7 +7487,8 @@ def runDPPPbase(ms, solint, nchan, parmdb, soltype, uvmin=1.,
 
     # figure out which weight_spectrum column to use
     if soltypein == 'scalarphasediff' or soltypein == 'scalarphasediffFR' or \
-            soltypein == 'phaseonly_slope' or soltypein == 'scalarphase_slope':
+            soltypein == 'phaseonly_slope' or soltypein == 'scalarphase_slope' or \
+            soltypein == 'phaseonly_rate' or soltypein == 'scalarphase_rate':
         weight_spectrum = 'WEIGHT_SPECTRUM_PM'
     else:
         # check for WEIGHT_SPECTRUM_SOLVE from DR2 products
