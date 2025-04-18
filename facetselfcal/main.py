@@ -4409,6 +4409,38 @@ def makephaseCDFh5_h5merger(phaseh5, ms, modeldatacolumns, backup=True, testscfa
     H5.close()
     return
 
+def makephaserateCDFh5_h5merger(phaseh5, ms, modeldatacolumns, backup=True, testscfactor=1.):
+    if len(modeldatacolumns) > 1:
+        merge_all_in_one = False
+    else:
+        merge_all_in_one = True
+
+    if backup:
+        if os.path.isfile(phaseh5 + '.psbackup'):
+            os.system('rm -f ' + phaseh5 + '.psbackup')
+        os.system('cp ' + phaseh5 + ' ' + phaseh5 + '.psbackup')
+    # going to overwrite phaseh5, first move to new file
+    if os.path.isfile(phaseh5 + '.in'):
+        os.system('rm -f ' + phaseh5 + '.in')
+    os.system('mv ' + phaseh5 + ' ' + phaseh5 + '.in')
+
+    merge_h5(h5_out=phaseh5, h5_tables=phaseh5 + '.in', ms_files=ms, merge_all_in_one=merge_all_in_one,
+             propagate_weights=True)
+    H5 = tables.open_file(phaseh5, mode='a')
+
+
+    phaseCDF = H5.root.sol000.phase000.val[:]  # time, freq, ant, dir, pol
+    print('Shape to make phase CDF array', phaseCDF.shape)
+    ntime = len(H5.root.sol000.phase000.time[:])
+    for tt in range(ntime - 1):
+        phaseCDF[tt, :, ...] = np.copy(
+            phaseCDF[tt + 1, :, ...] + (testscfactor * phaseCDF[tt, :, ...]))
+
+    print(phaseCDF.shape)
+    H5.root.sol000.phase000.val[:] = phaseCDF
+    H5.flush()
+    H5.close()
+
 
 def copyoverscalarphase(scalarh5, phasexxyyh5):
     # note for scalarphase/phaseonly solve, does not work for tecandphase as freq axis is missing there for phase000
@@ -7795,6 +7827,9 @@ def runDPPPbase(ms, solint, nchan, parmdb, soltype, uvmin=1.,
         print('Manually updating H5 to get the cumulative phase')
         # makephaseCDFh5(parmdb)
         makephaseCDFh5_h5merger(parmdb, ms, modeldatacolumns)
+    if incol == 'DATA_PHASE_RATE':
+        print('Manually updating H5 to get the cumulative phase')
+        makephaserateCDFh5_h5merger(parmdb, ms, modeldatacolumns)
 
     if resetsols is not None:
         if soltype in ['phaseonly', 'scalarphase', 'tecandphase', 'tec', 'rotation', 'fulljones',
