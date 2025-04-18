@@ -1966,6 +1966,57 @@ def create_phase_slope(inmslist, incol='DATA', outcol='DATA_PHASE_SLOPE',
         del data, dataslope
     return
 
+def create_phase_rate(inmslist, incol='DATA', outcol='DATA_PHASE_SLOPE',
+                       ampnorm=False, dysco=False, testscfactor=1., crosshandtozero=True):
+    """ Creates a new column to solve for a phase slope from.
+
+    Args:
+        inmslist (list): list of input measurement sets.
+        incol (str): name of the input column to copy (meta)data from.
+        outcol (str): name of the output column that will be created.
+        ampnorm (bool): If True, only takes phases from the input visibilities and sets their amplitude to 1.
+        dysco (bool): dysco compress the output column.
+    Returns:
+        None
+    """
+    if not isinstance(inmslist, list):
+        inmslist = [inmslist]
+    for ms in inmslist:
+        with table(ms, readonly=False, ack=True) as t:
+            if outcol not in t.colnames():
+                print('Adding', outcol, 'to', ms)
+                desc = t.getcoldesc(incol)
+                newdesc = makecoldesc(outcol, desc)
+                newdmi = t.getdminfo(incol)
+                if dysco:
+                    newdmi['NAME'] = 'Dysco' + outcol
+                else:
+                    newdmi['NAME'] = outcol
+                t.addcols(newdesc, newdmi)
+            data = t.getcol(incol)
+            dataslope = np.copy(data)
+            for tt in range(data.shape[0] - 1):
+                if ampnorm:
+                    dataslope[tt, :, 0] = np.copy(
+                        np.exp(1j * testscfactor * (np.angle(data[tt, :, 0]) - np.angle(data[tt + 1, :, 0]))))
+                    dataslope[tt, :, 3] = np.copy(
+                        np.exp(1j * testscfactor * (np.angle(data[tt, :, 3]) - np.angle(data[tt + 1, :, 3]))))
+                    if crosshandtozero:
+                        dataslope[tt, :, 1] = 0. * np.exp(1j * 0)
+                        dataslope[tt, :, 2] = 0. * np.exp(1j * 0)
+                else:
+                    dataslope[tt, :, 0] = np.copy(np.abs(data[tt, :, 0]) * np.exp(
+                        1j * testscfactor * (np.angle(data[tt, :, 0]) - np.angle(data[tt + 1, :, 0]))))
+                    dataslope[tt, :, 3] = np.copy(np.abs(data[tt, :, 3]) * np.exp(
+                        1j * testscfactor * (np.angle(data[tt, :, 3]) - np.angle(data[tt + 1, :, 3]))))
+                    if crosshandtozero:
+                        dataslope[tt, :, 1] = 0. * np.exp(1j * 0)
+                        dataslope[tt, :, 2] = 0. * np.exp(1j * 0)
+
+            # last freq set to second to last freq because difference reduces length of freq axis with one
+            dataslope[-1, :, :] = np.copy(dataslope[-2, :, :])
+            t.putcol(outcol, dataslope)
+
 
 def stackwrapper(inmslist: list, msout_prefix: str = 'stack', column_to_normalise: str = 'DATA') -> None:
     """ Wraps the stack
