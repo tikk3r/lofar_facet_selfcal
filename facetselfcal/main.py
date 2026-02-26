@@ -18369,9 +18369,6 @@ def runDPPPbase(ms, solint, nchan, parmdb, soltype, uvmin=1.,
             terminal_print('losoto ' + parmdb + ' ' + losotoparset)
             run('losoto ' + parmdb + ' ' + losotoparset, log=True)
 
-        if not args['DDE'] and flagging and not onechannel and ntimesH5(parmdb) > 1 and soltype in ['scalarphase'] and (selfcalcycle >= args['rfj_flagger_start']) and (telescope == "LOFAR") and (HBAorLBA == "HBA"):
-                from submods import solution_flagger
-                solution_flagger.flag_on_phase_score(parmdb)
 
         
 
@@ -18412,6 +18409,13 @@ def runDPPPbase(ms, solint, nchan, parmdb, soltype, uvmin=1.,
                 terminal_print('LoSoTo command:', cmdlosoto)
                 logger.info(cmdlosoto)
                 run(cmdlosoto)
+
+    if soltype in ["scalarphase"]:
+        if not args['DDE'] and not onechannel and ntimesH5(parmdb) > 1 and soltype in ['scalarphase'] and (selfcalcycle >= args['rfj_flagger_start']) and (telescope == "LOFAR") and (HBAorLBA == "HBA"):
+                logger.info("Flagging phase solutions based on quality")
+                from submods import solution_flagger
+                solution_flagger.flag_on_phase_score(parmdb)
+
 
     if soltype in ['phaseonly', 'scalarphase'] and not args['phasediff_only']:
         losotoparset_phase = create_losoto_fastphaseparset(ms, onechannel=onechannel, onepol=onepol,
