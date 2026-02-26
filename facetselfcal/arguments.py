@@ -476,6 +476,11 @@ def option_parser():
                                 type=ast.literal_eval)
 
 
+    # Experimental quality flagger settings
+    flaggingparser.add_argument('--rfj_flagger_start', 
+                                help='From this cycle on, employ this experimental flagger based on the solution validation that happens in PILOT.',
+                                default=None, type=int)
+
     # AOflagger settings
     add_bool_arg(flaggingparser, 'aoflagger', help='Run AOflagger on input data.', default=None, second_name='useaoflagger')
     add_bool_arg(flaggingparser, 'aoflaggerbeforeavg',
