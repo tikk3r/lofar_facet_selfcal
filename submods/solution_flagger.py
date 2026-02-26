@@ -263,62 +263,62 @@ def flag_on_phase_score(h5: str):
         h5: h5parm solution file
     """
 
-    hp = h5parm(h5, readonly=False)
-    ss = hp.getSolset("sol000")
-    st = ss.getSoltab("phase000")
-    freqs = st.getAxisValues("freq")
-    ants = st.getAxisValues("ant")
-    phase_sols = st.getValues()[0]
-    phase_weights = st.getValues(weight=True)[0]
-    flagged_before = np.nansum(phase_weights)
-    phase_sols = np.where(phase_weights > 0, phase_sols * phase_weights, np.nan)
-    axes = st.getAxesNames()
+    with h5parm(h5, readonly=False) as hp:
+        ss = hp.getSolset("sol000")
+        st = ss.getSoltab("phase000")
+        freqs = st.getAxisValues("freq")
+        ants = st.getAxisValues("ant")
+        phase_sols = st.getValues()[0]
+        phase_weights = st.getValues(weight=True)[0]
+        flagged_before = np.nansum(phase_weights)
+        phase_sols = np.where(phase_weights > 0, phase_sols * phase_weights, np.nan)
+        axes = st.getAxesNames()
 
-    # Remove polarisation and direction axis
-    had_pol = False
-    if 'pol' in axes:
-        phase_sols = np.take(phase_sols, 0, axis=axes.index('pol'))
-        phase_weights = np.take(phase_weights, 0, axis=axes.index('pol'))
-        had_pol = True
+        # Remove polarisation and direction axis
+        had_pol = False
+        if 'pol' in axes:
+            phase_sols = np.take(phase_sols, 0, axis=axes.index('pol'))
+            phase_weights = np.take(phase_weights, 0, axis=axes.index('pol'))
+            had_pol = True
 
-    had_dir = False
-    if 'dir' in axes:
-        phase_sols = np.take(phase_sols, 0, axis=axes.index('dir'))
-        phase_weights = np.take(phase_weights, 0, axis=axes.index('dir'))
-        had_dir = True
+        had_dir = False
+        if 'dir' in axes:
+            phase_sols = np.take(phase_sols, 0, axis=axes.index('dir'))
+            phase_weights = np.take(phase_weights, 0, axis=axes.index('dir'))
+            had_dir = True
 
-    # Reference solutions to first station
-    ref_phase = np.take(phase_sols, [0], axis=axes.index('ant'))
-    phase_sols -= ref_phase
+        # Reference solutions to first station
+        ref_phase = np.take(phase_sols, [0], axis=axes.index('ant'))
+        phase_sols -= ref_phase
 
-    # Get wraps
-    wrap_count = calc_wraps(phase_sols, axes)
+        # Get wraps
+        wrap_count = calc_wraps(phase_sols, axes)
 
-    # De-slope
-    old_axes_order = [a for a in axes if a not in ['pol', 'dir']]
-    print(old_axes_order)
-    phase_sols = reorderAxes(phase_sols, old_axes_order, ['ant', 'freq', 'time'])
-    phase_weights = reorderAxes(phase_weights, old_axes_order, ['ant', 'freq', 'time'])
+        # De-slope
+        old_axes_order = [a for a in axes if a not in ['pol', 'dir']]
+        print(old_axes_order)
+        phase_sols = reorderAxes(phase_sols, old_axes_order, ['ant', 'freq', 'time'])
+        phase_weights = reorderAxes(phase_weights, old_axes_order, ['ant', 'freq', 'time'])
 
-    for idx_ant, _ in enumerate(ants):
-        time_noise = get_phase_noise_statistic(phase_sols, idx_ant, freqs, wrap_count)
-        time_score = sigmoid(time_noise, 45, 10, True)
-        bad_times = np.where(time_score < 0.5)
-        phase_sols[idx_ant, :, bad_times, ...] = np.nan
-        phase_weights[idx_ant, :, bad_times, ...] = 0
+        for idx_ant, _ in enumerate(ants):
+            time_noise = get_phase_noise_statistic(phase_sols, idx_ant, freqs, wrap_count)
+            time_score = sigmoid(time_noise, 45, 10, True)
+            bad_times = np.where(time_score < 0.5)
+            phase_sols[idx_ant, :, bad_times, ...] = np.nan
+            phase_weights[idx_ant, :, bad_times, ...] = 0
 
-    phase_sols = reorderAxes(phase_sols, ['ant', 'freq', 'time'], old_axes_order)
-    phase_weights = reorderAxes(phase_weights, ['ant', 'freq', 'time'], old_axes_order)
-    if had_pol:
-        phase_sols = phase_sols[..., np.newaxis]
-        phase_weights = phase_weights[..., np.newaxis]
-    if had_dir:
-        phase_sols = phase_sols[..., np.newaxis]
-        phase_weights = phase_weights[..., np.newaxis]
-    st.setValues(phase_sols)
-    st.setValues(phase_weights, weight=True)
-    flagged_after = np.nansum(phase_weights)
-    print(f"Change in flags after flagging: {(flagged_after - flagged_before) / flagged_before * 100}%")
+        phase_sols = reorderAxes(phase_sols, ['ant', 'freq', 'time'], old_axes_order)
+        phase_weights = reorderAxes(phase_weights, ['ant', 'freq', 'time'], old_axes_order)
+        if had_pol:
+            phase_sols = phase_sols[..., np.newaxis]
+            phase_weights = phase_weights[..., np.newaxis]
+        if had_dir:
+            phase_sols = phase_sols[..., np.newaxis]
+            phase_weights = phase_weights[..., np.newaxis]
+        st.setValues(phase_sols)
+        st.setValues(phase_weights, weight=True)
+        flagged_after = np.nansum(phase_weights)
+        print(f"Change in flags after flagging: {(flagged_before - flagged_after) / flagged_after * 100}%")
 
 
 def get_amp_score(h5: str) -> float:
