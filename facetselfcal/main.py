@@ -18360,7 +18360,6 @@ def runDPPPbase(ms, solint, nchan, parmdb, soltype, uvmin=1.,
             'rotation+scalar', 'rotation+scalaramplitude', 'faradayrotation+diagonal', \
             'faradayrotation+diagonalamplitude', 'faradayrotation+scalar', \
             'faradayrotation+scalaramplitude'] and args['flagsolutionsbeforeresetsolsall']:
-        
             losotoparset = create_losoto_flag_ap_only(ms, maxrms=flagslowamprms,
                                                       maxrmsphase=flagslowphaserms,
                                                       includesphase=includesphase, onechannel=onechannel,
@@ -18369,6 +18368,12 @@ def runDPPPbase(ms, solint, nchan, parmdb, soltype, uvmin=1.,
             shutil.copy(parmdb, parmdb + '.allresetsolbackup_gridflagging')
             terminal_print('losoto ' + parmdb + ' ' + losotoparset)
             run('losoto ' + parmdb + ' ' + losotoparset, log=True)
+
+        if not args['DDE'] and flagging and not onechannel and ntimesH5(parmdb) > 1 and soltype in ['scalarphase'] and (selfcalcycle >= args['rfj_flagger_start']) and (telescope == "LOFAR") and (HBAorLBA == "HBA"):
+                from submods import solution_flagger
+                solution_flagger.flag_on_phase_score(parmdb)
+
+        
 
         # make a backup of the parmdb before resetting all solutions
         shutil.copy(parmdb, parmdb + '.allresetsolbackup')
