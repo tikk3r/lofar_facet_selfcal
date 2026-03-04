@@ -270,7 +270,7 @@ def flag_on_phase_score(h5: str):
         ants = st.getAxisValues("ant")
         phase_sols = st.getValues()[0]
         phase_weights = st.getValues(weight=True)[0]
-        flagged_before = np.nansum(phase_weights)
+        flagged_before = np.nansum(phase_weights) / np.prod(phase_weights.shape)
         phase_sols = np.where(phase_weights > 0, phase_sols * phase_weights, np.nan)
         axes = st.getAxesNames()
 
@@ -296,7 +296,6 @@ def flag_on_phase_score(h5: str):
 
         # De-slope
         old_axes_order = [a for a in axes if a not in ['pol', 'dir']]
-        print(old_axes_order)
         phase_sols = reorderAxes(phase_sols, old_axes_order, ['ant', 'freq', 'time'])
         phase_weights = reorderAxes(phase_weights, old_axes_order, ['ant', 'freq', 'time'])
 
@@ -317,8 +316,8 @@ def flag_on_phase_score(h5: str):
             phase_weights = phase_weights[..., np.newaxis]
         st.setValues(phase_sols)
         st.setValues(phase_weights, weight=True)
-        flagged_after = np.nansum(phase_weights)
-        print(f"Change in flags after flagging: {(flagged_before - flagged_after) / flagged_after * 100}%")
+        flagged_after = np.nansum(phase_weights) / np.prod(phase_weights.shape)
+        print(f"Change in flags after flagging: {flagged_before*100}% -> {flagged_after*100}%")
 
 
 def get_amp_score(h5: str) -> float:
