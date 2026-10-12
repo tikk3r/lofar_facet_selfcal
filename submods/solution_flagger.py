@@ -12,6 +12,7 @@ from losoto.h5parm import h5parm
 from scipy.stats import circstd
 from scipy.optimize import leastsq
 from losoto.lib_operations import reorderAxes
+from torch import Value
 
 def make_utf8(inp) -> str:
     """
@@ -276,9 +277,15 @@ def flag_on_phase_score(h5: str):
 
         # Remove polarisation and direction axis
         had_pol = False
+        npol = 0
         if 'pol' in axes:
-            phase_sols = np.take(phase_sols, 0, axis=axes.index('pol'))
-            phase_weights = np.take(phase_weights, 0, axis=axes.index('pol'))
+            npol = phase_sols.shape[axes.index('pol')]
+            if npol == 2:
+                print("Diagonal solutions; flagging independently.")
+            elif npol == 4:
+                print("Fulljones solutions; only quality-flagging parallel hands.")
+            #phase_sols = np.take(phase_sols, 0, axis=axes.index('pol'))
+            #phase_weights = np.take(phase_weights, 0, axis=axes.index('pol'))
             had_pol = True
 
         had_dir = False
@@ -299,25 +306,55 @@ def flag_on_phase_score(h5: str):
         phase_sols = reorderAxes(phase_sols, old_axes_order, ['ant', 'freq', 'time'])
         phase_weights = reorderAxes(phase_weights, old_axes_order, ['ant', 'freq', 'time'])
 
-        for idx_ant, _ in enumerate(ants):
-            time_noise = get_phase_noise_statistic(phase_sols, idx_ant, freqs, wrap_count)
-            time_score = sigmoid(time_noise, 45, 10, True)
-            bad_times = np.where(time_score < 0.5)
-            phase_sols[idx_ant, :, bad_times, ...] = np.nan
-            phase_weights[idx_ant, :, bad_times, ...] = 0
+        if not had_pol:
+            for idx_ant, _ in enumerate(ants):
+                time_noise = get_phase_noise_statistic(phase_sols, idx_ant, freqs, wrap_count)
+                time_score = sigmoid(time_noise, 45, 10, True)
+                bad_times = np.where(time_score < 0.5)
+                phase_sols[idx_ant, :, bad_times, ...] = np.nan
+                phase_weights[idx_ant, :, bad_times, ...] = 0
 
-        phase_sols = reorderAxes(phase_sols, ['ant', 'freq', 'time'], old_axes_order)
-        phase_weights = reorderAxes(phase_weights, ['ant', 'freq', 'time'], old_axes_order)
-        if had_pol:
-            phase_sols = phase_sols[..., np.newaxis]
-            phase_weights = phase_weights[..., np.newaxis]
-        if had_dir:
-            phase_sols = phase_sols[..., np.newaxis]
-            phase_weights = phase_weights[..., np.newaxis]
-        st.setValues(phase_sols)
-        st.setValues(phase_weights, weight=True)
-        flagged_after = np.nansum(phase_weights) / np.prod(phase_weights.shape)
-        print(f"Change in flags after flagging: {flagged_before*100}% -> {flagged_after*100}%")
+            phase_sols = reorderAxes(phase_sols, ['ant', 'freq', 'time'], old_axes_order)
+            phase_weights = reorderAxes(phase_weights, ['ant', 'freq', 'time'], old_axes_order)
+            if had_pol:
+                phase_sols = phase_sols[..., np.newaxis]
+                phase_weights = phase_weights[..., np.newaxis]
+            if had_dir:
+                phase_sols = phase_sols[..., np.newaxis]
+                phase_weights = phase_weights[..., np.newaxis]
+            st.setValues(phase_sols)
+            st.setValues(phase_weights, weight=True)
+            flagged_after = np.nansum(phase_weights) / np.prod(phase_weights.shape)
+            print(f"Change in flags after flagging: {flagged_before*100}% -> {flagged_after*100}%")
+        else:
+            if npol == 2:
+                pols = [0, 1]
+            elif npol == 4:
+                pols = [0, 3]
+            else:
+                raise ValueError("Encountered invalid number of polarisations")
+            for pol in pols:
+                print(f"Flagging phase solutions of polarisation {pol:d}")
+                for idx_ant, _ in enumerate(ants):
+                    phase_sols_pol = np.take(phase_sols, pol, axis=axes.index('pol'))
+                    time_noise = get_phase_noise_statistic(phase_sols_pol, idx_ant, freqs, wrap_count)
+                    time_score = sigmoid(time_noise, 45, 10, True)
+                    bad_times = np.where(time_score < 0.5)
+                    phase_sols[idx_ant, :, bad_times, pol] = np.nan
+                    phase_weights[idx_ant, :, bad_times, pol] = 0
+
+                phase_sols = reorderAxes(phase_sols, ['ant', 'freq', 'time'], old_axes_order)
+                phase_weights = reorderAxes(phase_weights, ['ant', 'freq', 'time'], old_axes_order)
+                if had_pol:
+                    phase_sols = phase_sols[..., np.newaxis]
+                    phase_weights = phase_weights[..., np.newaxis]
+                if had_dir:
+                    phase_sols = phase_sols[..., np.newaxis]
+                    phase_weights = phase_weights[..., np.newaxis]
+                st.setValues(phase_sols)
+                st.setValues(phase_weights, weight=True)
+                flagged_after = np.nansum(phase_weights) / np.prod(phase_weights.shape)
+                print(f"Change in flags after flagging: {flagged_before*100}% -> {flagged_after*100}%")
 
 
 def get_amp_score(h5: str) -> float:
