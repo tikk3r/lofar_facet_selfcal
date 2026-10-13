@@ -20967,6 +20967,10 @@ def findrefant_core(H5file, telescope='LOFAR'):
         if len(cs_indices) == 0:  # in case there are no CS stations try with RS
             cs_indices = np.where(['RS' in ant for ant in ants])[0]
 
+    if telescope == 'e-MERLIN':
+        possible_refants = ["Lo", "Mk2", "Pi", "Da", "Kn", "De", "Cm"]
+        cs_indices = np.where([ant in possible_refants for ant in ants])[0]
+
     if telescope == 'MeerKAT':
         possible_refants = possible_refants = ['m013', 'm012', 'm011', 'm010', 'm009', 'm002', 'm001','m000','m008','m007','m006','m005','m004','m003','m016','m017','m018','m019']
         cs_indices = np.where([ant in possible_refants for ant in ants])[0]
