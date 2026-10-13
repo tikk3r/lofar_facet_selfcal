@@ -19027,6 +19027,24 @@ def makeimage(mslist, imageout, pixsize, imsize, channelsout, niter=100000, robu
     msliststring = ' '.join(map(str, mslist))
     if idg:
         parallelgridding = 1
+
+    # Imaging hundreds of small chunks is inefficient. Here we first concatenate them
+    if args['telescope'] == "e-MERLIN":
+        from submods.MSChunker import concat_time_command
+        mses = list(sorted(glob.glob("split_measurements/*chunk*ms")))
+        # Concatenate them in batches to avoid "too many open files" issues.
+        nchunks = 4
+        chunks = len(mses)//nchunks
+        for i in range(4):
+            cmd = concat_time_command(mses[i*chunks:i*chunks + chunks], f"concat_{i:d}.ms")
+            subprocess.check_output(cmd)
+        mses_subconcat = [f"concat_{i:d}.ms" for i in range(nchunks)]
+        cmd = concat_time_command(mses_subconcat, "concat.ms")
+        subprocess.check_output(cmd)
+        # We need this later to predict back to the individual MSes for subsequent solves
+        msliststring_old = msliststring
+
+        msliststring = "concat.ms"
     
     # update the fitsmask if user provided DS9cleanmaskregionfile-exclude
     if fitsmask is not None and args['DS9cleanmaskregionfile_exclude'] is not None:
@@ -19530,6 +19548,8 @@ def makeimage(mslist, imageout, pixsize, imsize, channelsout, niter=100000, robu
         if predict and len(h5list) == 0 and not DDEimaging:
             # We check for DDEimaging to avoid a predict for image000 in a --DDE run
             # because at that moment there is no h5list yet, avoiding an unnecessary DI-type predict
+            if args["telescope"] == "e-MERLIN":
+                msliststring = msliststring_old
             cmd = 'wsclean -predict '  # -size '
             if args['ncpu_max_WSClean'] is not None:
                 cmd += '-j ' + str(args['ncpu_max_WSClean']) + ' '
