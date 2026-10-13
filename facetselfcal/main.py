@@ -19038,7 +19038,7 @@ def makeimage(mslist, imageout, pixsize, imsize, channelsout, niter=100000, robu
         for i in range(4):
             cmd = concat_time_command(mses[i*chunks:i*chunks + chunks], f"concat_{i:d}.ms")
             subprocess.check_output(cmd)
-        mses_subconcat = [f"concat_{i:d}.ms" for i in range(nchunks)]
+        mses_subconcat = list(glob.glob("concat_*.ms"))
         cmd = concat_time_command(mses_subconcat, "concat.ms")
         subprocess.check_output(cmd)
         # We need this later to predict back to the individual MSes for subsequent solves
